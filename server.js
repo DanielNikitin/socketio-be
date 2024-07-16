@@ -65,6 +65,7 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(3009, () => {
-  console.log('Server is running on port 3009');
+const PORT = 5000;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
