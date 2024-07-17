@@ -5,6 +5,7 @@ const cors = require('cors');
 const app = express();
 
 const { addUser, getUsers, removeUser, incrementRespect, getTotalRespect } = require("./users");
+const TotalRespect = require('./models/TotalRespect');
 
 app.use(cors({ origin: "*" }));
 
@@ -17,37 +18,72 @@ const io = new Server(server, {
   }
 });
 
-let totalRespect = 0;  // Глобальная переменная для хранения общего количества респектов
+let totalRespect = 0;
+let lastKnownTotalRespect = 0;
+
+async function initializeTotalRespect() {
+  totalRespect = await getTotalRespect();
+  lastKnownTotalRespect = totalRespect;
+  console.log(`Initial totalRespect from database: ${totalRespect}`);
+}
+
+initializeTotalRespect();
+
+async function updateTotalRespectInDatabaseIfConnectedClients() {
+  try {
+    const connectedClients = io.sockets.sockets.size;
+    if (connectedClients > 0) {
+      // Проверяем, изменилось ли значение totalRespect
+      if (totalRespect !== lastKnownTotalRespect) {
+        const dbTotalRespect = await TotalRespect.findOne();
+        if (!dbTotalRespect) {
+          await TotalRespect.create({ total: totalRespect });
+        } else {
+          await dbTotalRespect.update({ total: totalRespect });
+        }
+        console.log(`Updated totalRespect in database: ${totalRespect}`);
+        // Обновляем lastKnownTotalRespect до текущего значения
+        lastKnownTotalRespect = totalRespect;
+      } else {
+        console.log('No change in totalRespect, skipping database update.');
+      }
+    } else {
+      console.log('No connected clients, skipping database update.');
+    }
+  } catch (error) {
+    console.error('Error updating totalRespect in database:', error);
+  }
+}
+
+setInterval(updateTotalRespectInDatabaseIfConnectedClients, 5000);
 
 io.on('connection', (socket) => {
-  socket.on("join", ({ name }) => {
-    const { user } = addUser({ id: socket.id, name });
+  console.log(`Connected :: ${socket.id}`);
+  
+  socket.on("join", async ({ name }) => {
+    const { user } = await addUser({ name });
     console.log(`Connected ${user.name}`);
-    console.log(user);
 
-    socket.emit('message', {
-      data: { user: { name: "Admin", message: `Hello ${user.name}` } }
-    });
+    socket.username = user.name;
 
-    // Отправка обновленного списка пользователей и общего счета респектов всем клиентам
-    const users = getUsers();
+    const users = await getUsers();
     io.emit('updateUsers', { users, totalRespect });
   });
 
-  socket.on("respect", () => {
-    const user = incrementRespect(socket.id);
+  socket.on("respect", async () => {
+    const user = await incrementRespect(socket.username);
+
     if (user) {
-      totalRespect += 1;  // Увеличиваем общий счетчик респектов
+      console.log("User found");
+      totalRespect += 1;
       io.emit('animateRespect');
 
-      const users = getUsers();
+      const users = await getUsers();
       io.emit('updateUsers', { users, totalRespect });
 
-      // Отправка события для изменения цвета кнопки
-      const colors = [1, 2, 3]; // ID цветов
+      const colors = [1, 2, 3];
       const randomColorId = colors[Math.floor(Math.random() * colors.length)];
       io.emit('changeTextColor', { colorId: randomColorId });
-      console.log(randomColorId);
     }
   });
 
@@ -55,11 +91,11 @@ io.on('connection', (socket) => {
     socket.emit("status", "online");
   });
 
-  socket.on('disconnect', () => {
-    const user = removeUser(socket.id);
+  socket.on('disconnect', async () => {
+    const user = await removeUser(socket.username);
     if (user) {
       console.log(`Disconnected ${user.name}`);
-      const users = getUsers();
+      const users = await getUsers();
       io.emit('updateUsers', { users, totalRespect });
     }
   });
