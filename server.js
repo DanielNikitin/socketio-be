@@ -20,6 +20,7 @@ const io = new Server(server, {
 
 let totalRespect = 0;
 let lastKnownTotalRespect = 0;
+let updateInterval;
 
 async function initializeTotalRespect() {
   totalRespect = await getTotalRespect();
@@ -29,12 +30,11 @@ async function initializeTotalRespect() {
 
 initializeTotalRespect();
 
-async function updateTotalRespectInDatabaseIfConnectedClients() {
-  try {
+function startUpdateInterval() {
+  updateInterval = setInterval(async () => {
     const connectedClients = io.sockets.sockets.size;
     if (connectedClients > 0) {
-      // Проверяем, изменилось ли значение totalRespect
-      if (totalRespect !== lastKnownTotalRespect) {
+      try {
         const dbTotalRespect = await TotalRespect.findOne();
         if (!dbTotalRespect) {
           await TotalRespect.create({ total: totalRespect });
@@ -42,20 +42,19 @@ async function updateTotalRespectInDatabaseIfConnectedClients() {
           await dbTotalRespect.update({ total: totalRespect });
         }
         console.log(`Updated totalRespect in database: ${totalRespect}`);
-        // Обновляем lastKnownTotalRespect до текущего значения
         lastKnownTotalRespect = totalRespect;
-      } else {
-        console.log('No change in totalRespect, skipping database update.');
+      } catch (error) {
+        console.error('Error updating totalRespect in database:', error);
       }
     } else {
       console.log('No connected clients, skipping database update.');
     }
-  } catch (error) {
-    console.error('Error updating totalRespect in database:', error);
-  }
+  }, 5000);
 }
 
-setInterval(updateTotalRespectInDatabaseIfConnectedClients, 5000);
+function stopUpdateInterval() {
+  clearInterval(updateInterval);
+}
 
 io.on('connection', (socket) => {
   console.log(`Connected :: ${socket.id}`);
@@ -68,6 +67,11 @@ io.on('connection', (socket) => {
 
     const users = await getUsers();
     io.emit('updateUsers', { users, totalRespect });
+
+    // Start update interval if it's not already running
+    if (!updateInterval) {
+      startUpdateInterval();
+    }
   });
 
   socket.on("respect", async () => {
@@ -97,6 +101,12 @@ io.on('connection', (socket) => {
       console.log(`Disconnected ${user.name}`);
       const users = await getUsers();
       io.emit('updateUsers', { users, totalRespect });
+
+      // Stop update interval if no more connected clients
+      const connectedClients = io.sockets.sockets.size;
+      if (connectedClients === 0) {
+        stopUpdateInterval();
+      }
     }
   });
 });
