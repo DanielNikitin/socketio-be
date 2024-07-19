@@ -99,18 +99,19 @@ io.on('connection', (socket) => {
 
   socket.on("setStatus", async (status) => {
     console.log("CLI :: setStatus received", status);
-    const user = await setStatus(socket.username, status);
+    const result = await setStatus(socket.username, status);
   
-    if (user) {
-      console.log(`User found for changing status`, user.status);
-      
-      const users = await getUsers();
-      io.emit('updateUsers', { users, totalRespect });
+    if (result.success) {
       console.log(`Status updated to: ${status}`);
+      const users = await getUsers();
+      const totalRespect = await getTotalRespect();
+      io.emit('updateUsers', { users, totalRespect });
     } else {
-      console.log('User not found or status update failed');
+      socket.emit('statusUpdateError', result.message);
+      console.log(result.message);
     }
-  }); 
+  });
+  
 
   socket.on('disconnect', async () => {
     const user = await removeUser(socket.username);

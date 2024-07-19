@@ -60,6 +60,11 @@ const incrementRespect = async (name) => {
 async function setStatus(name, status) {
   const user = users.find((user) => user.name === name);
   if (user) {
+    if (user.respectCount < 100) {
+      // Возвращаем ошибку, если уважений недостаточно
+      return { success: false, message: 'Not enough respect. Min 100' };
+    }
+
     user.status = status;
     await User.update({ status: status }, { where: { name: name } });
 
@@ -70,14 +75,12 @@ async function setStatus(name, status) {
       users[index] = updatedUser.dataValues;
     }
 
-    return updatedUser.dataValues;
+    return { success: true, user: updatedUser.dataValues };
   } else {
     console.log('User not found');
-    return null;
+    return { success: false, message: 'User not found' };
   }
 }
-
-
 
 const getTotalRespect = async () => {
   try {
