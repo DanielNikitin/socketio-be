@@ -4,7 +4,7 @@ const { Server } = require("socket.io");
 const cors = require('cors');
 const app = express();
 
-const { addUser, getUsers, removeUser, incrementRespect, getTotalRespect } = require("./users");
+const { addUser, getUsers, removeUser, incrementRespect, getTotalRespect, setStatus } = require("./users");
 const TotalRespect = require('./models/TotalRespect');
 
 app.use(cors({ origin: "*" }));
@@ -25,7 +25,7 @@ let updateInterval;
 async function initializeTotalRespect() {
   totalRespect = await getTotalRespect();
   lastKnownTotalRespect = totalRespect;
-  console.log(`Initial totalRespect from database: ${totalRespect}`);
+ // console.log(`Initial totalRespect from database: ${totalRespect}`);
 }
 
 initializeTotalRespect();
@@ -41,7 +41,7 @@ function startUpdateInterval() {
         } else {
           await dbTotalRespect.update({ total: totalRespect });
         }
-        console.log(`Updated totalRespect in database: ${totalRespect}`);
+       // console.log(`Updated totalRespect in database: ${totalRespect}`);
         lastKnownTotalRespect = totalRespect;
       } catch (error) {
         console.error('Error updating totalRespect in database:', error);
@@ -56,14 +56,20 @@ function stopUpdateInterval() {
   clearInterval(updateInterval);
 }
 
+// server global listener for clients
 io.on('connection', (socket) => {
   console.log(`Connected :: ${socket.id}`);
-  
+
+  // client direct
+  socket.emit('server-status', 'online');
+
+  // when loggened
   socket.on("join", async ({ name }) => {
     const { user } = await addUser({ name });
     console.log(`Connected ${user.name}`);
 
     socket.username = user.name;
+
 
     const users = await getUsers();
     io.emit('updateUsers', { users, totalRespect });
@@ -78,7 +84,7 @@ io.on('connection', (socket) => {
     const user = await incrementRespect(socket.username);
 
     if (user) {
-      console.log("User found");
+      console.log("User found for adding respect count");
       totalRespect += 1;
       io.emit('animateRespect');
 
@@ -91,9 +97,20 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on("status", () => {
-    socket.emit("status", "online");
-  });
+  socket.on("setStatus", async (status) => {
+    console.log("CLI :: setStatus received", status);
+    const user = await setStatus(socket.username, status);
+  
+    if (user) {
+      console.log(`User found for changing status`, user.status);
+      
+      const users = await getUsers();
+      io.emit('updateUsers', { users, totalRespect });
+      console.log(`Status updated to: ${status}`);
+    } else {
+      console.log('User not found or status update failed');
+    }
+  }); 
 
   socket.on('disconnect', async () => {
     const user = await removeUser(socket.username);
@@ -113,5 +130,5 @@ io.on('connection', (socket) => {
 
 const PORT = 5000;
 server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`SERV :: Running on ${PORT}`);
 });

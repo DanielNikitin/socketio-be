@@ -1,6 +1,7 @@
 const { trimStr } = require("./utils");
 const TotalRespect = require('./models/TotalRespect');
 const User = require('./models/User');
+const MentalCon = require('./models/MentalCon');
 
 let users = [];
 
@@ -11,11 +12,12 @@ const addUser = async (user) => {
   if (!dbUser) {
     const userData = {
       name: userName,
-      respectCount: 0
+      respectCount: 0,
+      status: '0'
     };
     console.log("Creating user with values:", userData);
     dbUser = await User.create(userData);
-    console.log(`User created in database: ${dbUser.name}`);
+    console.log(`User created in database: ${dbUser.name} ${dbUser.respectCount} ${dbUser.status}`);
   }
 
   const currentUser = dbUser.dataValues;
@@ -42,18 +44,40 @@ const incrementRespect = async (name) => {
   const user = users.find((user) => user.name === name);
   if (user) {
     user.respectCount += 1;
-    await User.update({ respectCount: user.respectCount }, { where: { name: user.name } });
+    await User.update({ respectCount: user.respectCount }, { where: { name: name } });
 
     // Обновление пользователя в массиве users
-    const updatedUser = await User.findOne({ where: { name: user.name } });
+    const updatedUser = await User.findOne({ where: { name: name } });
     if (updatedUser) {
-      const index = users.findIndex(u => u.name === user.name);
+      const index = users.findIndex(u => u.name === name);
       users[index] = updatedUser.dataValues;
     }
 
     return updatedUser.dataValues;
   }
 };
+
+async function setStatus(name, status) {
+  const user = users.find((user) => user.name === name);
+  if (user) {
+    user.status = status;
+    await User.update({ status: status }, { where: { name: name } });
+
+    // Обновление пользователя в массиве users
+    const updatedUser = await User.findOne({ where: { name: name } });
+    if (updatedUser) {
+      const index = users.findIndex(u => u.name === name);
+      users[index] = updatedUser.dataValues;
+    }
+
+    return updatedUser.dataValues;
+  } else {
+    console.log('User not found');
+    return null;
+  }
+}
+
+
 
 const getTotalRespect = async () => {
   try {
@@ -66,4 +90,4 @@ const getTotalRespect = async () => {
   }
 };
 
-module.exports = { addUser, getUsers, removeUser, incrementRespect, getTotalRespect };
+module.exports = { addUser, getUsers, removeUser, incrementRespect, getTotalRespect, setStatus };

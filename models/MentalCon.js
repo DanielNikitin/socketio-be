@@ -1,25 +1,22 @@
 const { DataTypes, Model } = require('sequelize');
 const sequelize = require('../db');
 
-class User extends Model {}
+class MentalCon extends Model {}
 
-User.init({
-  name: {
-    type: DataTypes.STRING,
-    allowNull: false
-  },
-  respectCount: {
+MentalCon.init({
+  id: {
     type: DataTypes.INTEGER,
-    defaultValue: 0
+    primaryKey: true,
+    autoIncrement: true,
   },
   status: {
     type: DataTypes.STRING,
-    allowNull: true
+    allowNull: false
   }
 }, {
   sequelize,
-  modelName: 'User',
+  modelName: 'MentalCon',
   timestamps: false
 });
 
-module.exports = User;
+module.exports = MentalCon;
