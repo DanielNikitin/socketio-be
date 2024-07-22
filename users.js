@@ -62,7 +62,7 @@ async function setStatus(name, status) {
   if (user) {
     if (user.respectCount < 100) {
       // Возвращаем ошибку, если уважений недостаточно
-      return { success: false, message: 'Not enough respect. Min 100' };
+      return { success: false, message: 'Not enough Respect. Min 100 points' };
     }
 
     user.status = status;

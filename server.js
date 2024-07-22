@@ -4,7 +4,9 @@ const { Server } = require("socket.io");
 const cors = require('cors');
 const app = express();
 
-const { addUser, getUsers, removeUser, incrementRespect, getTotalRespect, setStatus } = require("./users");
+const { addUser, getUsers, removeUser, 
+incrementRespect, getTotalRespect, setStatus } = require("./users");
+
 const TotalRespect = require('./models/TotalRespect');
 
 app.use(cors({ origin: "*" }));
@@ -18,6 +20,8 @@ const io = new Server(server, {
   }
 });
 
+
+//// RESPECT COUNTER / DATABASE UPDATING
 let totalRespect = 0;
 let lastKnownTotalRespect = 0;
 let updateInterval;
@@ -56,7 +60,7 @@ function stopUpdateInterval() {
   clearInterval(updateInterval);
 }
 
-// server global listener for clients
+//// SERVER GLOBAL CONNECTION
 io.on('connection', (socket) => {
   console.log(`Connected :: ${socket.id}`);
 
@@ -70,7 +74,6 @@ io.on('connection', (socket) => {
 
     socket.username = user.name;
 
-
     const users = await getUsers();
     io.emit('updateUsers', { users, totalRespect });
 
@@ -80,6 +83,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // respect counter
   socket.on("respect", async () => {
     const user = await incrementRespect(socket.username);
 
@@ -97,6 +101,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // set status
   socket.on("setStatus", async (status) => {
     console.log("CLI :: setStatus received", status);
     const result = await setStatus(socket.username, status);
@@ -112,6 +117,11 @@ io.on('connection', (socket) => {
     }
   });
   
+//// IF CLIENT NOT RESPONDING
+  socket.on('checkStatus', async () => {
+    socket.emit('server-status', 'online');
+    console.log(`${socket.id} trying to attempt server status`);
+  })
 
   socket.on('disconnect', async () => {
     const user = await removeUser(socket.username);
@@ -120,7 +130,7 @@ io.on('connection', (socket) => {
       const users = await getUsers();
       io.emit('updateUsers', { users, totalRespect });
 
-      // Stop update interval if no more connected clients
+      // Stop update interval if no more connected clients (respect count in db)
       const connectedClients = io.sockets.sockets.size;
       if (connectedClients === 0) {
         stopUpdateInterval();
@@ -129,6 +139,8 @@ io.on('connection', (socket) => {
   });
 });
 
+
+//// SERVER SETTINGS 
 const PORT = 5000;
 server.listen(PORT, () => {
   console.log(`SERV :: Running on ${PORT}`);
