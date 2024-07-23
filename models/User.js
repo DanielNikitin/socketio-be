@@ -15,6 +15,14 @@ User.init({
   status: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  level: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1
+  },
+  rank: {
+    type: DataTypes.STRING,
+    defaultValue: 'Салага'
   }
 }, {
   sequelize,

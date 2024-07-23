@@ -29,7 +29,6 @@ let updateInterval;
 async function initializeTotalRespect() {
   totalRespect = await getTotalRespect();
   lastKnownTotalRespect = totalRespect;
- // console.log(`Initial totalRespect from database: ${totalRespect}`);
 }
 
 initializeTotalRespect();
@@ -48,12 +47,12 @@ function startUpdateInterval() {
        // console.log(`Updated totalRespect in database: ${totalRespect}`);
         lastKnownTotalRespect = totalRespect;
       } catch (error) {
-        console.error('Error updating totalRespect in database:', error);
+        console.error('SERV :: Error updating totalRespect in database:', error);
       }
     } else {
-      console.log('No connected clients, skipping database update.');
+      console.log('SERV :: No connected clients, skipping database update.');
     }
-  }, 5000);
+  }, 300);
 }
 
 function stopUpdateInterval() {
@@ -70,7 +69,7 @@ io.on('connection', (socket) => {
   // when loggened
   socket.on("join", async ({ name }) => {
     const { user } = await addUser({ name });
-    console.log(`Connected ${user.name}`);
+    console.log(`Joined :: ${user.name}`);
 
     socket.username = user.name;
 
@@ -86,20 +85,21 @@ io.on('connection', (socket) => {
   // respect counter
   socket.on("respect", async () => {
     const user = await incrementRespect(socket.username);
-
+  
     if (user) {
       console.log("User found for adding respect count");
       totalRespect += 1;
       io.emit('animateRespect');
-
+  
       const users = await getUsers();
       io.emit('updateUsers', { users, totalRespect });
-
+  
       const colors = [1, 2, 3];
       const randomColorId = colors[Math.floor(Math.random() * colors.length)];
       io.emit('changeTextColor', { colorId: randomColorId });
     }
   });
+  
 
   // set status
   socket.on("setStatus", async (status) => {
@@ -107,7 +107,7 @@ io.on('connection', (socket) => {
     const result = await setStatus(socket.username, status);
   
     if (result.success) {
-      console.log(`Status updated to: ${status}`);
+      console.log(`${socket.username} :: status updated to :: ${status}`);
       const users = await getUsers();
       const totalRespect = await getTotalRespect();
       io.emit('updateUsers', { users, totalRespect });
@@ -116,17 +116,19 @@ io.on('connection', (socket) => {
       console.log(result.message);
     }
   });
+
+  
   
 //// IF CLIENT NOT RESPONDING
   socket.on('checkStatus', async () => {
     socket.emit('server-status', 'online');
-    console.log(`${socket.id} trying to attempt server status`);
+    console.log(`${socket.id} :: trying to attempt server status`);
   })
 
   socket.on('disconnect', async () => {
     const user = await removeUser(socket.username);
     if (user) {
-      console.log(`Disconnected ${user.name}`);
+      console.log(`Disconnected :: ${user.name}`);
       const users = await getUsers();
       io.emit('updateUsers', { users, totalRespect });
 
@@ -141,7 +143,7 @@ io.on('connection', (socket) => {
 
 
 //// SERVER SETTINGS 
-const PORT = 5000;
+const PORT = 3009;
 server.listen(PORT, () => {
   console.log(`SERV :: Running on ${PORT}`);
 });
