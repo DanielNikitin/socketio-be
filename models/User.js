@@ -12,6 +12,10 @@ User.init({
     type: DataTypes.INTEGER,
     defaultValue: 0
   },
+  experiencePoints: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
   status: {
     type: DataTypes.STRING,
     allowNull: true
@@ -23,6 +27,15 @@ User.init({
   rank: {
     type: DataTypes.STRING,
     defaultValue: 'Салага'
+  },
+  items: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
+  lastSkin: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: "BtnSkin3"
   }
 }, {
   sequelize,

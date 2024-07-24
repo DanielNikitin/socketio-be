@@ -5,9 +5,15 @@ const cors = require('cors');
 const app = express();
 
 const { addUser, getUsers, removeUser, 
-incrementRespect, getTotalRespect, setStatus } = require("./users");
+incrementRespect, incrementExperience , doubleRespect,
+ getTotalRespect, setStatus, buyItem,
+setLastSkin, getLastSkin } = require("./users");
 
 const TotalRespect = require('./models/TotalRespect');
+const User = require('./models/User');
+
+// Раздача статических файлов из каталога 'public'
+app.use(express.static('public'));
 
 app.use(cors({ origin: "*" }));
 
@@ -84,19 +90,39 @@ io.on('connection', (socket) => {
 
   // respect counter
   socket.on("respect", async () => {
-    const user = await incrementRespect(socket.username);
-  
+    // Получаем данные пользователя
+    const user = await User.findOne({ where: { name: socket.username } });
+
     if (user) {
-      console.log("User found for adding respect count");
-      totalRespect += 1;
-      io.emit('animateRespect');
-  
-      const users = await getUsers();
-      io.emit('updateUsers', { users, totalRespect });
-  
-      const colors = [1, 2, 3];
-      const randomColorId = colors[Math.floor(Math.random() * colors.length)];
-      io.emit('changeTextColor', { colorId: randomColorId });
+      // Проверяем наличие предмета 'doublerespect'
+      const userItems = JSON.parse(user.items);
+      console.log(userItems);
+      const hasDoubleRespect = userItems.includes('DoubleRespect');
+
+      let updatedUser;
+      if (hasDoubleRespect) {
+        // Используем doubleRespect, если предмет найден
+        updatedUser = await doubleRespect(socket.username);
+        updatedUser = await incrementExperience(socket.username);
+        totalRespect += 2;
+      } else {
+        // Используем incrementRespect в противном случае
+        updatedUser = await incrementRespect(socket.username);
+        updatedUser = await incrementExperience(socket.username);
+        totalRespect += 1;
+      }
+
+      if (updatedUser) {
+        console.log("User found for adding respect count");
+        io.emit('animateRespect');
+
+        const users = await getUsers();
+        io.emit('updateUsers', { users, totalRespect });
+
+        const colors = [1, 2, 3];
+        const randomColorId = colors[Math.floor(Math.random() * colors.length)];
+        io.emit('changeTextColor', { colorId: randomColorId });
+      }
     }
   });
   
@@ -117,7 +143,44 @@ io.on('connection', (socket) => {
     }
   });
 
-  
+// buy item
+socket.on('buyItem', async ({ itemName }) => {
+  try {
+    const result = await buyItem(socket.username, itemName);
+    if (result.success) {
+      console.log(`${socket.username} purchased ${itemName}`);
+    } else {
+      console.log(`${socket.username} failed to purchase ${itemName}: ${result.message}`);
+    }
+
+    // Отправить ответ клиенту
+    socket.emit('buyItemResponse', result);
+
+    // Обновить пользователей
+    const users = await getUsers();
+    io.emit('updateUsers', { users, totalRespect });
+  } catch (error) {
+    console.error('Error handling buyItem:', error);
+    socket.emit('buyItemResponse', { success: false, message: 'Internal server error' });
+  }
+});
+
+  // Установка последнего скина
+  socket.on('setLastSkin', async ({ skin }) => {
+    const result = await setLastSkin(socket.username, skin);
+    if (result.success) {
+      console.log(`${socket.username} set last skin to ${skin}`);
+      io.emit('updateUsers', { users: await getUsers(), totalRespect });
+    } else {
+      console.log(result.message);
+    }
+  });
+
+  // Получение последнего скина
+  socket.on('getLastSkin', async () => {
+    const lastSkin = await getLastSkin(socket.username);
+    socket.emit('lastSkin', { lastSkin });
+  });
   
 //// IF CLIENT NOT RESPONDING
   socket.on('checkStatus', async () => {
